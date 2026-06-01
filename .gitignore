@@ -1,4 +1,5 @@
 node_modules/
 dist/
 .swc/
-.project.private.config.json
+package-lock.json
+project.private.config.json
