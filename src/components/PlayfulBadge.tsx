@@ -50,9 +50,10 @@ const GAIN_MESSAGES = [
 interface PlayfulBadgeProps {
   type: 'give' | 'gain';
   count: number;
+  compact?: boolean;
 }
 
-export default function PlayfulBadge({ type, count }: PlayfulBadgeProps) {
+export default function PlayfulBadge({ type, count, compact = false }: PlayfulBadgeProps) {
   const [visible, setVisible] = useState(false);
   const [displayCount, setDisplayCount] = useState(0);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -85,10 +86,39 @@ export default function PlayfulBadge({ type, count }: PlayfulBadgeProps) {
     return null;
   }
 
+  const icon = type === 'give' ? '🔥' : '📈';
   const messages = type === 'give' ? GIVE_MESSAGES : GAIN_MESSAGES;
   const messageIndex = Math.min(displayCount - 3, messages.length - 1);
   const message = messages[messageIndex];
-  const icon = type === 'give' ? '🔥' : '📈';
+
+  if (compact) {
+    // 紧凑模式：完整显示文案，固定高度药丸，在卡片行内居中
+    return (
+      <View style={{
+        height: 22,
+        paddingLeft: 6,
+        paddingRight: 6,
+        borderRadius: 11,
+        background: type === 'gain'
+          ? 'linear-gradient(135deg, #fbbf24, #f97316)'
+          : 'linear-gradient(135deg, #60a5fa, #a78bfa)',
+        display: 'inline-flex',
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexShrink: 0,
+      }}>
+        <Text style={{ fontSize: 11, marginRight: 2 }}>{icon}</Text>
+        <Text style={{
+          fontSize: 11,
+          fontWeight: '700',
+          color: '#ffffff',
+          maxWidth: 160,
+          overflow: 'hidden',
+        }} numberOfLines={1}>{message}</Text>
+      </View>
+    );
+  }
 
   return (
     <View style={{

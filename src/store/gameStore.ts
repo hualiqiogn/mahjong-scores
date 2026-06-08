@@ -149,11 +149,25 @@ export const useGameStore = create<GameState>()(
           timestamp: Date.now(),
         };
 
+        let totalGivenScore = 0;
+        if (state.gameMode === 'cumulative' && giverId) {
+          totalGivenScore = Object.entries(scoreChanges).reduce((sum, [pid, val]) => {
+            if (pid !== giverId && val > 0) {
+              return sum + val;
+            }
+            return sum;
+          }, 0);
+        }
+
         const updatedPlayers = state.players.map((player) => {
           let change = scoreChanges[player.id] || 0;
 
           if (state.gameMode === 'cumulative') {
-            change = Math.max(0, change);
+            if (player.id === giverId && totalGivenScore > 0) {
+              change = -totalGivenScore;
+            } else {
+              change = Math.max(0, change);
+            }
           }
 
           let newConsecutiveGives = player.consecutiveGives;

@@ -103,70 +103,72 @@ export default function Index() {
   }
 
   return (
-    <View style={{ minHeight: '100vh', background: 'linear-gradient(180deg, #FAFBFC 0%, #F0F4F8 50%, #FFFFFF 100%)' }}>
+    <View style={{ height: '100vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'linear-gradient(180deg, #FAFBFC 0%, #F0F4F8 50%, #FFFFFF 100%)' }}>
+      {/* 房间卡片 - 固定高度，全宽背景 */}
       <View style={{
-        position: 'relative',
-        zIndex: 30,
+        flexShrink: 0,
         background: 'rgba(255,255,255,0.8)',
         borderBottom: '1px solid #f1f5f9',
       }}>
         <View style={{
           maxWidth: 420,
           margin: '0 auto',
-          padding: '16px',
+          padding: '10px 16px',
+          boxSizing: 'border-box',
+          width: '100%',
         }}>
           <View style={{
             background: 'rgba(255,255,255,0.95)',
             border: '1px solid rgba(0,122,255,0.08)',
             boxShadow: '0 2px 12px rgba(0,122,255,0.04)',
             borderRadius: 16,
-            padding: 16,
+            padding: 14,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
           }}>
             <View style={{ display: 'flex', alignItems: 'center' }}>
               <View style={{
-                width: 44,
-                height: 44,
+                width: 40,
+                height: 40,
                 background: 'linear-gradient(135deg, #3B82F6, #2563EB)',
-                borderRadius: 12,
+                borderRadius: 10,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 boxShadow: '0 4px 12px rgba(59,130,246,0.3)',
-                marginRight: 12,
+                marginRight: 10,
               }}>
-                <Text style={{ fontSize: 22 }}>🐟</Text>
+                <Text style={{ fontSize: 20 }}>🐟</Text>
               </View>
               <View>
                 <View style={{ display: 'flex', alignItems: 'center' }}>
-                  <Text style={{ fontWeight: 600, color: '#1f2937', fontSize: 16 }}>麻将计分</Text>
+                  <Text style={{ fontWeight: 600, color: '#1f2937', fontSize: 15 }}>麻将计分</Text>
                   {syncing && (
-                    <Text style={{ fontSize: 12, color: '#9ca3af', marginLeft: 8 }}>同步中...</Text>
+                    <Text style={{ fontSize: 11, color: '#9ca3af', marginLeft: 6 }}>同步中...</Text>
                   )}
                 </View>
-                <View style={{ display: 'flex', alignItems: 'center', marginTop: 4 }}>
+                <View style={{ display: 'flex', alignItems: 'center', marginTop: 3 }}>
                   <View style={{
                     background: '#eff6ff',
-                    borderRadius: 8,
-                    paddingLeft: 10,
-                    paddingRight: 10,
-                    paddingTop: 4,
-                    paddingBottom: 4,
+                    borderRadius: 6,
+                    paddingLeft: 8,
+                    paddingRight: 8,
+                    paddingTop: 2,
+                    paddingBottom: 2,
                   }}>
-                    <Text style={{ fontSize: 12, fontFamily: 'monospace', color: '#2563eb', fontWeight: 500 }}>
+                    <Text style={{ fontSize: 11, fontFamily: 'monospace', color: '#2563eb', fontWeight: 500 }}>
                       {roomId}
                     </Text>
                   </View>
                   <View
                     onClick={handleCopyRoomId}
-                    style={{ padding: 6, marginLeft: 8 }}
+                    style={{ padding: 4, marginLeft: 6 }}
                   >
-                    <Text style={{ fontSize: 14, color: '#9ca3af' }}>📋</Text>
+                    <Text style={{ fontSize: 12, color: '#9ca3af' }}>📋</Text>
                   </View>
                   {copied && (
-                    <Text style={{ fontSize: 12, color: '#22c55e', fontWeight: 500, marginLeft: 4 }}>已复制</Text>
+                    <Text style={{ fontSize: 11, color: '#22c55e', fontWeight: 500, marginLeft: 3 }}>已复制</Text>
                   )}
                 </View>
               </View>
@@ -174,73 +176,84 @@ export default function Index() {
             <View style={{ display: 'flex', alignItems: 'center' }}>
               <View
                 onClick={handleManualRefresh}
-                style={{
-                  padding: 8,
-                  marginRight: 4,
-                  borderRadius: 8,
-                }}
+                style={{ padding: 6, marginRight: 2, borderRadius: 8 }}
               >
-                <Text style={{ fontSize: 18, color: syncing ? '#93c5fd' : '#3b82f6' }}>🔄</Text>
+                <Text style={{ fontSize: 16, color: syncing ? '#93c5fd' : '#3b82f6' }}>🔄</Text>
               </View>
               <View
                 onClick={() => setShowLeaveConfirm(true)}
-                style={{ padding: 10 }}
+                style={{ padding: 6 }}
               >
-                <Text style={{ fontSize: 20, color: '#9ca3af' }}>🚪</Text>
+                <Text style={{ fontSize: 18, color: '#9ca3af' }}>🚪</Text>
               </View>
             </View>
           </View>
         </View>
       </View>
 
-      <View style={{ maxWidth: 420, margin: '0 auto', padding: '16px', paddingBottom: 120 }}>
-        <View style={{ marginBottom: 24 }}>
+      {/* 中间内容区 - flex:1 自适应，与房间卡片同宽 */}
+      <View style={{
+        flex: 1,
+        display: 'flex',
+        flexDirection: 'column',
+        maxWidth: 420,
+        margin: '0 auto',
+        padding: '8px 16px',
+        width: '100%',
+        boxSizing: 'border-box',
+        overflow: 'hidden',
+      }}>
+        {/* 玩家列表 - flex:1 填充剩余空间 */}
+        <View style={{ flex: 1 }}>
           <PlayerCards />
         </View>
+
+        {/* 对局记录按钮 - 固定高度 */}
         <View
           onClick={() => setShowRoundHistory(true)}
           style={{
+            flexShrink: 0,
             display: 'flex',
             flexDirection: 'row',
             alignItems: 'center',
             justifyContent: 'center',
-            padding: '14px',
-            borderRadius: '16px',
+            padding: '10px',
+            borderRadius: '14px',
             backgroundColor: '#F8FAFC',
             border: '1px solid #E2E8F0',
+            marginTop: 8,
           }}
         >
-          <Text style={{ fontSize: '16px', marginRight: '8px' }}>📋</Text>
-          <Text style={{ fontSize: '15px', color: '#475569', fontWeight: '600' }}>对局记录</Text>
+          <Text style={{ fontSize: '15px', marginRight: '6px' }}>📋</Text>
+          <Text style={{ fontSize: '14px', color: '#475569', fontWeight: '600' }}>对局记录</Text>
           {useGameStore.getState().rounds.length > 0 && (
-            <View style={{ backgroundColor: '#EFF6FF', borderRadius: '10px', paddingLeft: '8px', paddingRight: '8px', paddingTop: '2px', paddingBottom: '2px', marginLeft: '8px' }}>
-              <Text style={{ fontSize: '12px', color: '#2563EB', fontWeight: '600' }}>{useGameStore.getState().rounds.length}局</Text>
+            <View style={{ backgroundColor: '#EFF6FF', borderRadius: '8px', paddingLeft: '6px', paddingRight: '6px', paddingTop: '2px', paddingBottom: '2px', marginLeft: '6px' }}>
+              <Text style={{ fontSize: '11px', color: '#2563EB', fontWeight: '600' }}>{useGameStore.getState().rounds.length}局</Text>
             </View>
           )}
         </View>
       </View>
 
+      {/* 底部按钮 - 固定高度，全宽背景 */}
       <View style={{
-        position: 'fixed',
-        bottom: 0,
-        left: 0,
-        right: 0,
+        flexShrink: 0,
         background: 'rgba(255,255,255,0.9)',
         borderTop: '1px solid #f1f5f9',
-        zIndex: 20,
       }}>
         <View style={{
           maxWidth: 420,
           margin: '0 auto',
-          padding: 16,
+          padding: '10px 16px',
+          boxSizing: 'border-box',
+          width: '100%',
           display: 'flex',
-          gap: 12,
+          gap: 10,
         }}>
           <View
             onClick={() => setShowEndConfirm(true)}
             style={{
-              padding: '14px 20px',
-              borderRadius: 16,
+              padding: '12px 18px',
+              borderRadius: 14,
               border: '1px solid #e5e7eb',
               color: '#4b5563',
               fontWeight: 600,
@@ -250,27 +263,27 @@ export default function Index() {
               justifyContent: 'center',
             }}
           >
-            <Text style={{ fontSize: 16, marginRight: 6 }}>✕</Text>
-            <Text style={{ color: '#4b5563', fontWeight: 600, fontSize: 14 }}>结束游戏</Text>
+            <Text style={{ fontSize: 14, marginRight: 4 }}>✕</Text>
+            <Text style={{ color: '#4b5563', fontWeight: 600, fontSize: 13 }}>结束游戏</Text>
           </View>
           <View
             onClick={() => setShowScoreModal(true)}
             style={{
               flex: 1,
-              padding: '14px 24px',
-              borderRadius: 16,
+              padding: '12px 20px',
+              borderRadius: 14,
               background: 'linear-gradient(135deg, #3B82F6, #2563EB)',
               color: '#ffffff',
               fontWeight: 600,
-              fontSize: 16,
+              fontSize: 14,
               boxShadow: '0 4px 12px rgba(59,130,246,0.3)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
             }}
           >
-            <Text style={{ fontSize: 20, marginRight: 6, color: '#fff' }}>＋</Text>
-            <Text style={{ color: '#fff', fontWeight: 600, fontSize: 16 }}>记录本局</Text>
+            <Text style={{ fontSize: 18, marginRight: 4, color: '#fff' }}>＋</Text>
+            <Text style={{ color: '#fff', fontWeight: 600, fontSize: 14 }}>记录本局</Text>
           </View>
         </View>
       </View>
