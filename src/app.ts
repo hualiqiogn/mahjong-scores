@@ -10,16 +10,14 @@ const SHARE_CONFIG = {
     title: '鱼乐无穷｜多人麻将计分工具',
     desc: '免费线上记牌算分，4人联机同步对局数据',
     path: '/pages/index/index',
-    // 如需自定义分享封面图，准备一张 5:4 比例的 PNG/JPG
-    // 放入 public/share-logo.png，然后将下面改为 imageUrl: '/share-logo.png'
-    // 留空则微信自动截取当前页面作为分享图
-    imageUrl: '',
+    // 分享封面图：麻将红中牌，public/share-cover.png 编译后会自动放入 dist/
+    imageUrl: '/share-cover.png',
   },
   /** 分享到朋友圈 */
   timeline: {
     title: '鱼乐无穷｜多人麻将计分工具',
     query: '',
-    imageUrl: '',
+    imageUrl: '/share-cover.png',
   },
 };
 // =====================================
