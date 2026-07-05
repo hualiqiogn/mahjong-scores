@@ -2,12 +2,12 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import Taro from '@tarojs/taro';
 import {
-  createRoom as supabaseCreateRoom,
-  joinRoom as supabaseJoinRoom,
-  recordRoundToSupabase,
+  createRoom as sbCreateRoom,
+  joinRoom as sbJoinRoom,
+  recordRoundToCloud,
   endRoomGame,
   resetRoomGame,
-  leaveRoomFromSupabase,
+  leaveRoomFromCloud,
   fetchRoom,
 } from '@/services/roomService';
 import type { RoomData, RoomPlayer, RoomRound } from '@/services/roomService';
@@ -101,7 +101,7 @@ export const useGameStore = create<GameState>()(
 
       createRoom: async (playerName, mode, baseScore) => {
         const roomId = generateRoomId();
-        await supabaseCreateRoom(roomId, mode, baseScore, playerName);
+        await sbCreateRoom(roomId, mode, baseScore, playerName);
 
         set({
           roomId,
@@ -120,20 +120,20 @@ export const useGameStore = create<GameState>()(
       },
 
       joinRoom: async (roomId, playerName) => {
-        const result = await supabaseJoinRoom(roomId, playerName);
+        const result = await sbJoinRoom(roomId, playerName);
         if (!result) return false;
 
-        const { playerId, roomData } = result;
+        const { roomData } = result;
 
         set({
           roomId,
           inRoom: true,
-          myPlayerId: playerId,
-          gameMode: roomData.gameMode,
-          baseScore: roomData.baseScore,
+          myPlayerId: roomData.players.find(p => p.name === playerName)?.id || null,
+          gameMode: roomData.game_mode,
+          baseScore: roomData.base_score,
           players: roomData.players,
           rounds: roomData.rounds || [],
-          isGameOver: roomData.isGameOver,
+          isGameOver: roomData.is_game_over,
           _lastLocalUpdate: 0,
         });
 
@@ -152,9 +152,7 @@ export const useGameStore = create<GameState>()(
         let totalGivenScore = 0;
         if (state.gameMode === 'cumulative' && giverId) {
           totalGivenScore = Object.entries(scoreChanges).reduce((sum, [pid, val]) => {
-            if (pid !== giverId && val > 0) {
-              return sum + val;
-            }
+            if (pid !== giverId && val > 0) return sum + val;
             return sum;
           }, 0);
         }
@@ -211,12 +209,15 @@ export const useGameStore = create<GameState>()(
           };
         });
 
+        const newRounds = [...state.rounds, round];
+
         set({
           players: updatedPlayers,
-          rounds: [...state.rounds, round],
+          rounds: newRounds,
           _lastLocalUpdate: Date.now(),
         });
 
+        // 异步写 Supabase
         if (state.roomId) {
           const roomRound: RoomRound = {
             id: round.id,
@@ -224,12 +225,16 @@ export const useGameStore = create<GameState>()(
             giverId,
             timestamp: round.timestamp,
           };
-          recordRoundToSupabase(state.roomId, updatedPlayers as RoomPlayer[], roomRound).catch(() => {});
+          recordRoundToCloud(state.roomId, updatedPlayers as RoomPlayer[], [...state.rounds, roomRound]).catch(() => {});
         }
       },
 
       endGame: () => {
         set({ isGameOver: true, _lastLocalUpdate: Date.now() });
+        const state = get();
+        if (state.roomId) {
+          endRoomGame(state.roomId).catch(() => {});
+        }
       },
 
       resetGame: () => {
@@ -248,12 +253,16 @@ export const useGameStore = create<GameState>()(
           isGameOver: false,
           _lastLocalUpdate: Date.now(),
         });
+
+        if (state.roomId) {
+          resetRoomGame(state.roomId, resetPlayers as RoomPlayer[]).catch(() => {});
+        }
       },
 
       leaveGame: () => {
         const state = get();
         if (state.roomId && state.myPlayerId) {
-          leaveRoomFromSupabase(state.roomId, state.myPlayerId).catch(() => {});
+          leaveRoomFromCloud(state.roomId, state.myPlayerId).catch(() => {});
         }
         set({
           roomId: '',
@@ -269,21 +278,17 @@ export const useGameStore = create<GameState>()(
       syncFromRemote: (data: RoomData) => {
         const state = get();
         const now = Date.now();
-        if (now - state._lastLocalUpdate < LOCAL_UPDATE_GRACE) {
-          return;
-        }
+        if (now - state._lastLocalUpdate < LOCAL_UPDATE_GRACE) return;
 
         const remoteRounds = data.rounds || [];
-        const localRoundCount = state.rounds.length;
-        if (remoteRounds.length < localRoundCount) {
-          return;
-        }
+        if (remoteRounds.length < state.rounds.length) return;
 
         set({
           players: data.players,
           rounds: remoteRounds,
-          gameMode: data.gameMode,
-          baseScore: data.baseScore,
+          gameMode: data.game_mode,
+          baseScore: data.base_score,
+          isGameOver: data.is_game_over,
         });
       },
 
@@ -292,9 +297,7 @@ export const useGameStore = create<GameState>()(
         if (!roomId) return;
         try {
           const data = await fetchRoom(roomId);
-          if (data) {
-            get().syncFromRemote(data);
-          }
+          if (data) get().syncFromRemote(data);
         } catch {}
       },
     }),
@@ -309,13 +312,12 @@ export const useGameStore = create<GameState>()(
         baseScore: state.baseScore,
         players: state.players,
         rounds: state.rounds,
+        isGameOver: state.isGameOver,
       }),
       onRehydrateStorage: () => {
         return (_state, error) => {
           if (error) {
-            try {
-              Taro.removeStorageSync('mahjong-scores');
-            } catch {}
+            try { Taro.removeStorageSync('mahjong-scores'); } catch {}
           }
         };
       },

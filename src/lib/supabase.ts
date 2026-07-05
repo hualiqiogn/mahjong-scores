@@ -1,80 +1,96 @@
-const BASE = 'https://sfcuusotndtlfyfkworf.supabase.co';
-const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNmY3V1c290bmR0bGZ5Zmt3b3JmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAxNDQ4ODIsImV4cCI6MjA5NTcyMDg4Mn0.YqECvqlvzJAhSCXLIV6yw_mkrZhJixKmGWGTDG_3AP8';
+import Taro from '@tarojs/taro';
 
-function headers(): Record<string, string> {
+/**
+ * Supabase REST API 手动封装（兼容微信小程序环境）
+ * 不使用 Supabase SDK，纯 wx.request 实现，避免小程序兼容问题
+ *
+ * ============ 注册步骤（5 分钟，零成本）============
+ * 1. 打开 https://supabase.com 用邮箱注册（无需认证、无需绑卡）
+ * 2. 创建新项目 → 选离你最近的区域（如 Singapore）
+ * 3. 进入 SQL Editor → 执行以下 SQL 建表：
+ *
+ *    CREATE TABLE rooms (
+ *      id TEXT PRIMARY KEY,
+ *      game_mode TEXT DEFAULT 'cumulative',
+ *      base_score INTEGER DEFAULT 10,
+ *      players JSONB DEFAULT '[]',
+ *      rounds JSONB DEFAULT '[]',
+ *      is_game_over BOOLEAN DEFAULT false,
+ *      created_at BIGINT DEFAULT 0,
+ *      updated_at BIGINT DEFAULT 0
+ *    );
+ *
+ *    ALTER TABLE rooms ENABLE ROW LEVEL SECURITY;
+ *    CREATE POLICY "Allow all" ON rooms FOR ALL USING (true) WITH CHECK (true);
+ *
+ * 4. 进入 Settings → API → 拿到 Project URL 和 anon/public key
+ * 5. 填入下方配置
+ *
+ * ============ 免费额度 ============
+ * 500MB 数据库 + 5GB 带宽，4 人打麻将绑绑有余
+ * ================================================
+ */
+
+// ============ 替换为你自己的凭证 ============
+const SUPABASE_URL = 'https://aeflaggpxccztufmpqji.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFlZmxhZ2dweGNjenR1Zm1wcWppIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMyNTQwMzcsImV4cCI6MjA5ODgzMDAzN30.wYim5jnjWDdYl8OzQ4IQHvwCDbsxXGOyDdyR24tlXI8';
+// ================================================
+
+function getHeaders(): Record<string, string> {
   return {
-    apikey: ANON_KEY,
-    Authorization: `Bearer ${ANON_KEY}`,
     'Content-Type': 'application/json',
+    'apikey': SUPABASE_ANON_KEY,
+    'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
   };
 }
 
-function singleRequest<T>(method: string, path: string, body?: any): Promise<T> {
+/** 通用请求 */
+function request<T>(method: string, path: string, body?: any): Promise<T> {
   return new Promise((resolve, reject) => {
     (wx as any).request({
-      url: BASE + '/rest/v1/' + path,
-      method,
-      header: headers(),
-      data: body || undefined,
+      url: `${SUPABASE_URL}/rest/v1${path}`,
+      method: method as any,
+      header: getHeaders(),
+      data: body,
+      timeout: 10000,
       success: (res: any) => {
         if (res.statusCode >= 200 && res.statusCode < 300) {
-          const data = res.data;
-          if (typeof data === 'string') {
-            try {
-              resolve(JSON.parse(data));
-            } catch {
-              resolve(data as T);
-            }
-          } else {
-            resolve(data as T);
-          }
+          resolve(res.data as T);
         } else {
-          reject(new Error(`Supabase ${res.statusCode}`));
+          reject(new Error(`Supabase ${res.statusCode}: ${JSON.stringify(res.data)}`));
         }
       },
-      fail: () => {
-        reject(new Error('network fail'));
+      fail: (err: any) => {
+        reject(new Error(err.errMsg || 'network fail'));
       },
     });
   });
 }
 
-async function requestOnce<T>(method: string, path: string, body?: any): Promise<T> {
-  return singleRequest<T>(method, path, body);
+/** 插入数据 */
+export async function insertRow<T extends Record<string, any>>(
+  table: string,
+  data: T,
+): Promise<T> {
+  return request<T>('POST', `/${table}`, data);
 }
 
-async function requestWithRetry<T>(method: string, path: string, body?: any): Promise<T> {
-  let lastError: Error | null = null;
-  for (let i = 0; i < 2; i++) {
-    try {
-      return await singleRequest<T>(method, path, body);
-    } catch (err) {
-      lastError = err as Error;
-      if (i < 1) {
-        await new Promise(r => setTimeout(r, 1000));
-      }
-    }
-  }
-  throw lastError;
+/** 根据 ID 获取单条 */
+export async function getRow<T>(
+  table: string,
+  id: string,
+  idColumn = 'id',
+): Promise<T | null> {
+  const results = await request<T[]>('GET', `/${table}?${idColumn}=eq.${id}&limit=1`);
+  return results.length > 0 ? results[0] : null;
 }
 
-export const db = {
-  from: (table: string) => ({
-    select: (columns: string) => ({
-      eq: (col: string, val: string) => ({
-        single: (): Promise<any> =>
-          requestOnce('GET', `${table}?select=${columns}&${col}=eq.${val}&limit=1`).then(
-            (rows: any) => (rows && rows.length > 0 ? rows[0] : null),
-          ),
-        execute: (): Promise<any[]> =>
-          requestOnce('GET', `${table}?select=${columns}&${col}=eq.${val}`),
-      }),
-    }),
-    insert: (record: any): Promise<void> =>
-      requestOnce('POST', table, record).then(() => {}),
-    update: (record: any) => ({
-      eq: (col: string, val: string): Promise<void> =>
-        requestWithRetry('PATCH', `${table}?${col}=eq.${val}`, record).then(() => {}),
-    }),
-  }),
-};
+/** 更新数据 */
+export async function updateRow<T extends Record<string, any>>(
+  table: string,
+  id: string,
+  data: Partial<T>,
+  idColumn = 'id',
+): Promise<void> {
+  await request('PATCH', `/${table}?${idColumn}=eq.${id}`, data);
+}

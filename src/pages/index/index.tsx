@@ -104,7 +104,7 @@ export default function Index() {
 
   return (
     <View style={{ height: '100vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'linear-gradient(180deg, #FAFBFC 0%, #F0F4F8 50%, #FFFFFF 100%)' }}>
-      {/* 房间卡片 - 固定高度，全宽背景 */}
+      {/* 房间卡片 */}
       <View style={{
         flexShrink: 0,
         background: 'rgba(255,255,255,0.8)',
@@ -191,7 +191,7 @@ export default function Index() {
         </View>
       </View>
 
-      {/* 中间内容区 - flex:1 自适应，与房间卡片同宽 */}
+      {/* 中间内容区 */}
       <View style={{
         flex: 1,
         display: 'flex',
@@ -203,12 +203,10 @@ export default function Index() {
         boxSizing: 'border-box',
         overflow: 'hidden',
       }}>
-        {/* 玩家列表 - flex:1 填充剩余空间 */}
         <View style={{ flex: 1 }}>
           <PlayerCards />
         </View>
 
-        {/* 对局记录按钮 - 固定高度 */}
         <View
           onClick={() => setShowRoundHistory(true)}
           style={{
@@ -234,7 +232,7 @@ export default function Index() {
         </View>
       </View>
 
-      {/* 底部按钮 - 固定高度，全宽背景 */}
+      {/* 底部按钮 */}
       <View style={{
         flexShrink: 0,
         background: 'rgba(255,255,255,0.9)',

@@ -1,5 +1,7 @@
-import { db } from '@/lib/supabase';
+import { insertRow, getRow, updateRow } from '@/lib/supabase';
 import type { GameMode } from '@/store/gameStore';
+
+const TABLE = 'rooms';
 
 export interface RoomPlayer {
   id: string;
@@ -18,21 +20,37 @@ export interface RoomRound {
 }
 
 export interface RoomData {
-  roomId: string;
+  id: string;
+  game_mode: GameMode;
+  base_score: number;
+  players: RoomPlayer[];
+  rounds: RoomRound[];
+  is_game_over: boolean;
+  created_at: number;
+  updated_at: number;
+}
+
+/** 将 RoomData 转换为数据库列格式（snake_case） */
+function toDB(roomId: string, data: {
   gameMode: GameMode;
   baseScore: number;
   players: RoomPlayer[];
   rounds: RoomRound[];
   isGameOver: boolean;
-  createdAt: number;
+}): RoomData {
+  return {
+    id: roomId,
+    game_mode: data.gameMode,
+    base_score: data.baseScore,
+    players: data.players,
+    rounds: data.rounds,
+    is_game_over: data.isGameOver,
+    created_at: Date.now(),
+    updated_at: Date.now(),
+  };
 }
 
-const TABLE = 'rooms';
-
-function wrapData(id: string, data: RoomData) {
-  return { id, data, updated_at: new Date().toISOString() };
-}
-
+/** 创建房间 */
 export async function createRoom(
   roomId: string,
   gameMode: GameMode,
@@ -46,74 +64,74 @@ export async function createRoom(
     { id: 'p4', name: '等待加入', score: 0, consecutiveGives: 0, consecutiveGains: 0, lastScoreChange: 0 },
   ];
 
-  const roomData: RoomData = {
-    roomId,
+  const row = toDB(roomId, {
     gameMode,
     baseScore,
     players,
     rounds: [],
     isGameOver: false,
-    createdAt: Date.now(),
-  };
+  });
 
-  await db.from(TABLE).insert(wrapData(roomId, roomData));
+  await insertRow(TABLE, row);
   return roomId;
 }
 
+/** 通过房间号获取房间 */
+export async function fetchRoom(roomId: string): Promise<RoomData | null> {
+  return getRow<RoomData>(TABLE, roomId);
+}
+
+/** 加入房间 */
 export async function joinRoom(
   roomId: string,
   playerName: string,
-): Promise<{ playerId: string; roomData: RoomData } | null> {
-  const row = await db.from(TABLE).select('data').eq('id', roomId).single();
-  if (!row) return null;
+): Promise<{ roomData: RoomData } | null> {
+  const doc = await fetchRoom(roomId);
+  if (!doc) return null;
 
-  const roomData: RoomData = row.data;
-  if (roomData.isGameOver) return null;
+  if (doc.is_game_over) return null;
 
-  const emptyIndex = roomData.players.findIndex(
+  const players = [...doc.players];
+  const emptyIndex = players.findIndex(
     (p) => p.name === '等待加入' || p.name.startsWith('玩家'),
   );
   if (emptyIndex === -1) return null;
 
-  const playerId = roomData.players[emptyIndex].id;
-  roomData.players[emptyIndex].name = playerName;
+  players[emptyIndex] = {
+    ...players[emptyIndex],
+    name: playerName,
+  };
 
-  await db.from(TABLE).update(wrapData(roomId, roomData)).eq('id', roomId);
+  await updateRow(TABLE, roomId, {
+    players,
+    updated_at: Date.now(),
+  });
 
-  return { playerId, roomData };
+  return { roomData: { ...doc, players } };
 }
 
-export async function fetchRoom(roomId: string): Promise<RoomData | null> {
-  const row = await db.from(TABLE).select('data').eq('id', roomId).single();
-  if (!row) return null;
-  return row.data as RoomData;
-}
-
-export async function recordRoundToSupabase(
+/** 记录一局得分 */
+export async function recordRoundToCloud(
   roomId: string,
   players: RoomPlayer[],
-  round: RoomRound,
+  rounds: RoomRound[],
 ): Promise<void> {
-  const row = await db.from(TABLE).select('data').eq('id', roomId).single();
-  if (!row) return;
-
-  const roomData: RoomData = row.data;
-  roomData.players = players;
-  roomData.rounds = [...(roomData.rounds || []), round];
-
-  await db.from(TABLE).update(wrapData(roomId, roomData)).eq('id', roomId);
+  await updateRow(TABLE, roomId, {
+    players,
+    rounds,
+    updated_at: Date.now(),
+  });
 }
 
+/** 结束游戏 */
 export async function endRoomGame(roomId: string): Promise<void> {
-  const row = await db.from(TABLE).select('data').eq('id', roomId).single();
-  if (!row) return;
-
-  const roomData: RoomData = row.data;
-  roomData.isGameOver = true;
-
-  await db.from(TABLE).update(wrapData(roomId, roomData)).eq('id', roomId);
+  await updateRow(TABLE, roomId, {
+    is_game_over: true,
+    updated_at: Date.now(),
+  });
 }
 
+/** 重置游戏 */
 export async function resetRoomGame(
   roomId: string,
   players: RoomPlayer[],
@@ -125,30 +143,26 @@ export async function resetRoomGame(
     consecutiveGains: 0,
     lastScoreChange: 0,
   }));
-
-  const row = await db.from(TABLE).select('data').eq('id', roomId).single();
-  if (!row) return;
-
-  const roomData: RoomData = row.data;
-  roomData.players = resetPlayers;
-  roomData.rounds = [];
-  roomData.isGameOver = false;
-
-  await db.from(TABLE).update(wrapData(roomId, roomData)).eq('id', roomId);
+  await updateRow(TABLE, roomId, {
+    players: resetPlayers,
+    rounds: [],
+    is_game_over: false,
+    updated_at: Date.now(),
+  });
 }
 
-export async function leaveRoomFromSupabase(
+/** 玩家离开房间 */
+export async function leaveRoomFromCloud(
   roomId: string,
   playerId: string,
 ): Promise<void> {
-  const row = await db.from(TABLE).select('data').eq('id', roomId).single();
-  if (!row) return;
-
-  const roomData: RoomData = row.data;
+  const doc = await fetchRoom(roomId);
+  if (!doc) return;
+  const players = [...doc.players];
   const playerIndex = parseInt(playerId.replace('p', '')) - 1;
-  if (playerIndex >= 0 && playerIndex < roomData.players.length) {
-    roomData.players[playerIndex] = {
-      id: roomData.players[playerIndex].id,
+  if (playerIndex >= 0 && playerIndex < players.length) {
+    players[playerIndex] = {
+      id: players[playerIndex].id,
       name: '等待加入',
       score: 0,
       consecutiveGives: 0,
@@ -156,6 +170,8 @@ export async function leaveRoomFromSupabase(
       lastScoreChange: 0,
     };
   }
-
-  await db.from(TABLE).update(wrapData(roomId, roomData)).eq('id', roomId);
+  await updateRow(TABLE, roomId, {
+    players,
+    updated_at: Date.now(),
+  });
 }
